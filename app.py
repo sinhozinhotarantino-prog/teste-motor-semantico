@@ -23,8 +23,13 @@ def conectar_google_sheets():
         # Tenta usar o ficheiro local (quando testa no seu computador)
         credenciais = Credentials.from_service_account_file("credentials.json", scopes=escopos)
     except FileNotFoundError:
-        # Converte de forma segura os segredos do Streamlit Cloud (evita erros de padding PEM)
+        # Pega os segredos do Streamlit Cloud de forma segura
         dict_credenciais = dict(st.secrets["gcp_service_account"])
+        
+        # Garante que as quebras de linha da chave privada são interpretadas corretamente
+        if "private_key" in dict_credenciais:
+            dict_credenciais["private_key"] = dict_credenciais["private_key"].replace("\\n", "\n")
+            
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         
     # 3. Ligar e abrir a planilha exata

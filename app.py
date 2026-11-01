@@ -26,9 +26,11 @@ def conectar_google_sheets():
         # Pega os segredos do Streamlit Cloud de forma segura
         dict_credenciais = dict(st.secrets["gcp_service_account"])
         
-        # Garante que as quebras de linha da chave privada são interpretadas corretamente
+        # Garante a correção das quebras de linha da chave privada independentemente de como foi colada
         if "private_key" in dict_credenciais:
-            dict_credenciais["private_key"] = dict_credenciais["private_key"].replace("\\n", "\n")
+            pk = dict_credenciais["private_key"]
+            pk = pk.replace("\\n", "\n")
+            dict_credenciais["private_key"] = pk
             
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         

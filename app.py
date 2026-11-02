@@ -5,12 +5,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import uuid
-import json
-import base64
 
 st.set_page_config(page_title="Validação de Clareza Textual", layout="centered")
 st.title("🧪 Pesquisa de Clareza e Leitura")
-st.caption("v2.0 - Código Atualizado")
+st.caption("v3.0 - Resolução Nativa TOML")
 st.write("Escolha qual das duas frases é mais fácil e agradável de entender.")
 
 # --- CONFIGURAÇÃO GOOGLE SHEETS ---
@@ -25,30 +23,8 @@ def conectar_google_sheets():
         # 1. Tenta usar o ficheiro local (no computador)
         credenciais = Credentials.from_service_account_file("credentials.json", scopes=escopos)
     except FileNotFoundError:
-        # 2. Se estiver na nuvem, lê o segredo (seja em Base64, JSON ou TOML)
-        if "google_credentials_b64" in st.secrets:
-            # Descodifica a string Base64 limpa
-            b64_str = st.secrets["google_credentials_b64"]
-            json_bytes = base64.b64decode(b64_str)
-            dict_credenciais = json.loads(json_bytes.decode("utf-8"))
-        elif "google_credentials" in st.secrets:
-            texto_json = st.secrets["google_credentials"]
-            dict_credenciais = json.loads(texto_json, strict=False) if isinstance(texto_json, str) else dict(texto_json)
-        elif "gcp_service_account" in st.secrets:
-            dict_credenciais = dict(st.secrets["gcp_service_account"])
-        else:
-            raise ValueError("Nenhuma chave de credenciais encontrada em st.secrets.")
-        
-        # Trata a chave privada se vier com caracteres escapados
-        if "private_key" in dict_credenciais:
-            pk = str(dict_credenciais["private_key"])
-            header = "-----BEGIN PRIVATE KEY-----"
-            footer = "-----END PRIVATE KEY-----"
-            if header in pk and footer in pk:
-                corpo = pk.split(header)[1].split(footer)[0]
-                corpo_limpo = corpo.replace("\\n", "").replace("\n", "").replace("\r", "").replace(" ", "").replace("\\", "")
-                dict_credenciais["private_key"] = f"{header}\n{corpo_limpo}\n{footer}\n"
-            
+        # 2. Nuvem: Puxa os dados nativos do TOML configurado nos Secrets
+        dict_credenciais = dict(st.secrets["gcp_service_account"])
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         
     cliente = gspread.authorize(credenciais)
@@ -107,7 +83,7 @@ try:
             st.info(opcao_2[1])
             if st.button("Preferir esta versão", key="btn_2"):
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_1[0]]
+                nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_2[0]]
                 planilha.append_row(nova_linha)
                 
                 st.session_state.index_atual += 1

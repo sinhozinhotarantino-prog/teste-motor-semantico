@@ -24,9 +24,14 @@ def conectar_google_sheets():
         # Tenta usar o ficheiro local (quando testa no seu computador)
         credenciais = Credentials.from_service_account_file("credentials.json", scopes=escopos)
     except FileNotFoundError:
-        # Lê o segredo como um bloco de texto único e converte para dicionário com a biblioteca nativa do Python
+        # Lê o segredo como texto e converte para dicionário
         texto_json = st.secrets["google_credentials"]
         dict_credenciais = json.loads(texto_json, strict=False)
+        
+        # Converte as sequências literais '\n' em quebras de linha reais
+        if "private_key" in dict_credenciais:
+            dict_credenciais["private_key"] = dict_credenciais["private_key"].replace("\\n", "\n")
+            
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         
     # 3. Ligar e abrir a planilha exata

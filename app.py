@@ -5,11 +5,9 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import uuid
-import re  # <- Biblioteca para Expressões Regulares
 
 st.set_page_config(page_title="Validação de Clareza Textual", layout="centered")
 st.title("🧪 Pesquisa de Clareza e Leitura")
-st.caption("v5.0 - Blindagem Total (Expressões Regulares)")
 st.write("Escolha qual das duas frases é mais fácil e agradável de entender.")
 
 # --- CONFIGURAÇÃO GOOGLE SHEETS ---
@@ -17,35 +15,24 @@ st.write("Escolha qual das duas frases é mais fácil e agradável de entender."
 def conectar_google_sheets():
     escopos = [
         "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
+        "https://www.googleapis.com/auth/drive",
     ]
     
     try:
-        # 1. Tenta usar o ficheiro local (no computador)
-        credenciais = Credentials.from_service_account_file("credentials.json", scopes=escopos)
+        # 1. Leitura local para testes no seu computador
+        credenciais = Credentials.from_service_account_file(
+            "credentials.json",
+            scopes=escopos,
+        )
     except FileNotFoundError:
-        # 2. Nuvem: Puxa os dados nativos do TOML configurado nos Secrets
+        # 2. Leitura direta dos Secrets no Streamlit Cloud
         dict_credenciais = dict(st.secrets["gcp_service_account"])
+        dict_credenciais["private_key"] = dict_credenciais["private_key"].replace("\\n", "\n")
         
-        # --- BLINDAGEM TOTAL DA CHAVE PRIVADA ---
-        if "private_key" in dict_credenciais:
-            pk = str(dict_credenciais["private_key"]).replace("\\n", "\n")
-            
-            # Procura o início e o fim da chave para isolar o miolo
-            match = re.search(r'-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----', pk, re.DOTALL)
-            
-            if match:
-                # Extrai apenas os caracteres válidos de Base64 (ignora TUDO o resto: \n, \r, espaços, lixo invisível)
-                clean_b64 = re.sub(r'[^a-zA-Z0-9+/=]', '', match.group(1))
-                
-                # Garante que o comprimento é múltiplo de 4 (corrige o problema do '1625')
-                clean_b64 += "=" * ((4 - len(clean_b64) % 4) % 4)
-                
-                # Reconstrói em linhas perfeitas de exatamente 64 caracteres
-                chunks = [clean_b64[i:i+64] for i in range(0, len(clean_b64), 64)]
-                dict_credenciais["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
-            
-        credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
+        credenciais = Credentials.from_service_account_info(
+            dict_credenciais,
+            scopes=escopos,
+        )
         
     cliente = gspread.authorize(credenciais)
     return cliente.open("Respostas_Motor_Semantico").sheet1
@@ -103,7 +90,7 @@ try:
             st.info(opcao_2[1])
             if st.button("Preferir esta versão", key="btn_2"):
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_2[0]]
+                nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_1[0]]
                 planilha.append_row(nova_linha)
                 
                 st.session_state.index_atual += 1

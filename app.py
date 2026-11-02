@@ -14,19 +14,22 @@ st.write("Escolha qual das duas frases é mais fácil e agradável de entender."
 # --- CONFIGURAÇÃO GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_google_sheets():
+    # 1. Definir o acesso necessário
     escopos = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
     
     try:
+        # Tenta usar o ficheiro local (quando testa no seu computador)
         credenciais = Credentials.from_service_account_file("credentials.json", scopes=escopos)
     except FileNotFoundError:
-        # Lê o segredo 'google_credentials' como texto puro e converte com json.loads
+        # Lê o segredo como um bloco de texto único e converte para dicionário com a biblioteca nativa do Python
         texto_json = st.secrets["google_credentials"]
-        dict_credenciais = json.loads(texto_json)
+        dict_credenciais = json.loads(texto_json, strict=False)
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         
+    # 3. Ligar e abrir a planilha exata
     cliente = gspread.authorize(credenciais)
     return cliente.open("Respostas_Motor_Semantico").sheet1
 
@@ -39,14 +42,17 @@ except Exception as e:
 
 @st.cache_data
 def carregar_dados():
+    # Lê a planilha local com as perguntas (testes A/B)
     df = pd.read_excel("planilha_testes_ab.xlsx")
     return df
 
 try:
     df_testes = carregar_dados()
     
+    # Inicialização do controle de estado
     if "index_atual" not in st.session_state:
         st.session_state.index_atual = 0
+    # Cria um ID único (8 letras/números) para identificar a sessão deste usuário
     if "sessao_id" not in st.session_state:
         st.session_state.sessao_id = str(uuid.uuid4())[:8] 
 
@@ -59,6 +65,7 @@ try:
         st.progress((idx) / len(df_testes))
         st.subheader(f"Par {idx + 1} de {len(df_testes)}")
 
+        # Embaralha a ordem de exibição para eliminar viés de posição
         opcoes = [("A", linha["Frase_A"]), ("B", linha["Frase_B"])]
         if "ordem_embaralhada" not in st.session_state or st.session_state.get("idx_salvo") != idx:
             random.shuffle(opcoes)
@@ -72,6 +79,7 @@ try:
         with col1:
             st.info(opcao_1[1])
             if st.button("Preferir esta versão", key="btn_1"):
+                # Captura a hora exata e envia a linha para a nuvem
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_1[0]]
                 planilha.append_row(nova_linha)
@@ -82,6 +90,7 @@ try:
         with col2:
             st.info(opcao_2[1])
             if st.button("Preferir esta versão", key="btn_2"):
+                # Captura a hora exata e envia a linha para a nuvem
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 nova_linha = [data_hora, st.session_state.sessao_id, id_par, linha["Frase_A"], linha["Frase_B"], opcao_2[0]]
                 planilha.append_row(nova_linha)

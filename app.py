@@ -5,10 +5,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import uuid
+import re  # <- Biblioteca para Expressões Regulares
 
 st.set_page_config(page_title="Validação de Clareza Textual", layout="centered")
 st.title("🧪 Pesquisa de Clareza e Leitura")
-st.caption("v4.0 - Correção de Quebra de Linha (64 chars)")
+st.caption("v5.0 - Blindagem Total (Expressões Regulares)")
 st.write("Escolha qual das duas frases é mais fácil e agradável de entender.")
 
 # --- CONFIGURAÇÃO GOOGLE SHEETS ---
@@ -26,11 +27,23 @@ def conectar_google_sheets():
         # 2. Nuvem: Puxa os dados nativos do TOML configurado nos Secrets
         dict_credenciais = dict(st.secrets["gcp_service_account"])
         
-        # --- A MÁGICA DA IMAGEM ESTÁ AQUI ---
+        # --- BLINDAGEM TOTAL DA CHAVE PRIVADA ---
         if "private_key" in dict_credenciais:
-            # Remove o \r (Carriage Return invisível do Windows) que corrompe o limite de 64 caracteres
-            pk = dict_credenciais["private_key"].replace("\\n", "\n").replace("\r", "")
-            dict_credenciais["private_key"] = pk
+            pk = str(dict_credenciais["private_key"]).replace("\\n", "\n")
+            
+            # Procura o início e o fim da chave para isolar o miolo
+            match = re.search(r'-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----', pk, re.DOTALL)
+            
+            if match:
+                # Extrai apenas os caracteres válidos de Base64 (ignora TUDO o resto: \n, \r, espaços, lixo invisível)
+                clean_b64 = re.sub(r'[^a-zA-Z0-9+/=]', '', match.group(1))
+                
+                # Garante que o comprimento é múltiplo de 4 (corrige o problema do '1625')
+                clean_b64 += "=" * ((4 - len(clean_b64) % 4) % 4)
+                
+                # Reconstrói em linhas perfeitas de exatamente 64 caracteres
+                chunks = [clean_b64[i:i+64] for i in range(0, len(clean_b64), 64)]
+                dict_credenciais["private_key"] = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END PRIVATE KEY-----\n"
             
         credenciais = Credentials.from_service_account_info(dict_credenciais, scopes=escopos)
         
